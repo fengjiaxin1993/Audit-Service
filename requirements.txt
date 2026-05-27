@@ -1,0 +1,27 @@
+# FastAPI 后端框架
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# CORS 中间件
+starlette>=0.27.0
+
+# 数据验证
+pydantic>=2.5.0
+
+# PDF处理
+PyMuPDF>=1.23.0
+
+# OCR
+paddleocr>=2.7.0
+paddlepaddle>=2.5.0
+
+# 图像处理
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# 工具库
+requests>=2.31.0
+
+# 数据库
+sqlalchemy>=2.0.0
