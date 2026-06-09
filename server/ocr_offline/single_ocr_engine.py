@@ -26,9 +26,9 @@ for log_name in logging.root.manager.loggerDict:
 from paddleocr import PaddleOCR
 import numpy as np
 
-from server.ocr.ocr_helper import _to_builtin
+from server.ocr_offline.ocr_helper import _to_builtin
 
-from server.configs.ocr_config import DET_MODEL_NAME, DET_MODEL_PATH, REC_MODEL_NAME, REC_MODEL_PATH
+from configs.ocr_config import DET_MODEL_NAME, DET_MODEL_PATH, REC_MODEL_NAME, REC_MODEL_PATH
 
 
 class GlobalOcrEngine:

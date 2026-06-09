@@ -94,10 +94,9 @@ def get_pdf_pages(filepath: str, zoom_factor: float = 2.0) -> Dict[str, Any]:
                 "img_base64": img_base64,
                 "width": width,
                 "height": height,
-                "ocr_width": ocr_width,
-                "ocr_height": ocr_height
+                "ocr_width": 595,
+                "ocr_height": 842
             })
-
         doc.close()
 
         return {

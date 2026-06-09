@@ -1,4 +1,4 @@
-from server.ocr.ocr_extract_utils import _call_ocr_parse, process_file_ocr
+from server.ocr_offline.ocr_extract_utils import _call_ocr_parse, process_file_ocr
 
 
 def test_offline_parse():

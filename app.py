@@ -5,6 +5,14 @@ FastAPI 后端主应用 - PDF OCR 与关键词定位系统
 import logging
 import uvicorn
 from server.api_server.server_app import create_app
+from server.common.task_queue import start_task_workers
+from server.db.base import Base, engine
+
+# 确保所有模型被导入，SQLAlchemy 才能自动建表
+from server.db.models.contract_model import ContractModel  # noqa
+from server.db.models.audit_rule_model import AuditRuleModel  # noqa
+from server.db.models.task_model import TaskModel  # noqa
+from server.db.models.audit_result_model import AuditResultModel
 
 # -------------- 配置日志（在抑制 stderr 之前设置） --------------
 logging.basicConfig(
@@ -15,11 +23,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def create_tables():
+    Base.metadata.create_all(bind=engine)
+    logger.info("数据库表已创建/更新")
+
+
 # ==================== 主程序入口 ====================
 def run_api_server():
     print()  # 空行
     logger.info("=" * 50)
-    logger.info("PDF OCR API 服务启动中...")
+    logger.info("OCR API 服务启动中...")
     logger.info("=" * 50)
 
     app = create_app()
@@ -33,6 +46,8 @@ def run_api_server():
     logger.info("=" * 50)
     print()  # 空行
 
+    create_tables()
+    start_task_workers()
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 

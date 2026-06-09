@@ -1,10 +1,9 @@
 from typing import List, Dict, Optional
 
 
-def find_text_positions_in_json(clause_text: str, json_result: Dict) -> List[Dict]:
+def find_text_positions_in_json(clause_text: str, doc_id_list: List[str], json_result: Dict) -> List[Dict]:
     """
     在OCR JSON结果中查找文本位置
-    使用多策略匹配：精确匹配 → 归一化匹配 → OCR兜底
     """
     if not clause_text or not json_result:
         return []
@@ -74,14 +73,19 @@ def find_text_positions_in_json(clause_text: str, json_result: Dict) -> List[Dic
     matches = []
     matched_block_ids = set()
 
-    layout_results = json_result.get("layoutParsingResults", [])
+    layout_results = json_result.get("layout_res_list", [])
 
     for layout_idx, layout_result in enumerate(layout_results):
-        pruned_result = layout_result.get("prunedResult", {})
-        parsing_list = pruned_result.get("parsing_res_list", [])
+        # 从 meta 中提取真实页码，兜底使用 layout_idx
+        meta = layout_result.get("meta", {})
+        page_num = meta.get("page_num", layout_idx) if isinstance(meta, dict) else layout_idx
 
-        # 策略1：精确匹配
+        parsing_list = layout_result.get("parsing_res_list", [])
+
         for block in parsing_list:
+            doc_id = block.get("doc_id")
+            if doc_id not in doc_id_list:
+                continue
             block_id = block.get("block_id")
             if block_id in matched_block_ids:
                 continue
@@ -90,11 +94,9 @@ def find_text_positions_in_json(clause_text: str, json_result: Dict) -> List[Dic
             if not block_content:
                 continue
 
-            block_content_clean = " ".join(block_content.split())
-
             matched = False
             for keyword in keywords_exact:
-                if keyword in block_content_clean:
+                if keyword in block_content:
                     matched = True
                     break
 
@@ -105,89 +107,7 @@ def find_text_positions_in_json(clause_text: str, json_result: Dict) -> List[Dic
                     "block_content": block_content,
                     "block_bbox": block.get("block_bbox", []),
                     "layout_idx": layout_idx,
+                    "page_num": page_num,
                     "match_type": "exact"
                 })
-
-        # 策略2：归一化匹配
-        if len(matches) < 2:
-            for block in parsing_list:
-                block_id = block.get("block_id")
-                if block_id in matched_block_ids:
-                    continue
-
-                block_content = block.get("block_content", "")
-                if not block_content:
-                    continue
-
-                block_normalized = normalize_text(block_content)
-
-                matched = False
-                for keyword in keywords_normalized:
-                    if keyword in block_normalized:
-                        matched = True
-                        break
-
-                if matched:
-                    matched_block_ids.add(block_id)
-                    matches.append({
-                        "block_id": block_id,
-                        "block_content": block_content,
-                        "block_bbox": block.get("block_bbox", []),
-                        "layout_idx": layout_idx,
-                        "match_type": "normalized"
-                    })
-
-        # 策略3：overall_ocr_res兜底
-        if len(matches) < 1:
-            overall_ocr = pruned_result.get("overall_ocr_res", {})
-            rec_texts = overall_ocr.get("rec_texts", [])
-            rec_boxes = overall_ocr.get("rec_boxes", [])
-            rec_polys = overall_ocr.get("rec_polys", [])
-
-            for idx, rec_text in enumerate(rec_texts):
-                if not rec_text:
-                    continue
-
-                rec_text_normalized = normalize_text(rec_text)
-
-                matched = False
-                for keyword in keywords_normalized:
-                    if keyword in rec_text_normalized:
-                        matched = True
-                        break
-
-                if matched:
-                    box = rec_boxes[idx] if idx < len(rec_boxes) else []
-                    poly = rec_polys[idx] if idx < len(rec_polys) else []
-                    matches.append({
-                        "block_id": f"ocr_{idx}",
-                        "block_content": rec_text,
-                        "block_bbox": box if box else [],
-                        "rec_poly": poly,
-                        "layout_idx": layout_idx,
-                        "match_type": "ocr"
-                    })
-
     return matches
-
-
-def find_field_positions(
-        extract_info: Dict[str, str],
-        json_result: Optional[Dict],
-) -> Dict[str, List]:
-    """
-    找到提取的字段信息 在json中的位置信息
-    """
-
-    field_positions = {}  # 记录位置
-
-    if json_result:
-        for field_name, field_value in extract_info.items():
-            if field_value and field_value != '-':
-                # 搜索value的所有位置
-                value_positions = find_text_positions_in_json(field_value, json_result)
-                if value_positions:
-                    # 如果有多个匹配，选择第一个
-                    field_positions[field_name] = value_positions[:1]
-
-    return field_positions

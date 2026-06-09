@@ -1,16 +1,20 @@
 import os
+import shutil
 from typing import Optional
-
-import fitz
 from fastapi import APIRouter, Body, UploadFile, File
 
+from server.api_server.utils import ApiResponse
+from server.common.file_tools import ensure_cache_dir
 from server.common.pdf_tools import get_pdf_pages
+from server.common.task_queue import task_worker
 from server.configs.basic_config import UPLOAD_DIR
-from server.contract.contract_extract import extract_contract_fields
+from server.contract.contract_extract import get_contract_fields
+from server.db.repository import get_contract_by_name, add_task, add_contract
+from server.db.repository.task_repository import get_task_by_id
 
 ocr_router = APIRouter(prefix="/api", tags=["OCR文件识别"])
 
-
+@ocr_router.post("/pdf_pages")
 async def pdf_pages(
         filepath: Optional[str] = Body(None, embed=True, description="文件路径")): 
     """
@@ -24,57 +28,132 @@ async def pdf_pages(
     - **pages**: 页面列表
     - **total_pages**: 总页数
     """
-    print(f"filepath: {filepath}")
     if not filepath:
         return {"success": False, "error": "文件路径为空", "pages": []}
     return get_pdf_pages(filepath, 1.0)
 
 
-async def upload_pdf(
-        file: UploadFile = File(...)):
-    """
-    上传PDF文件（自动去重：内容相同的文件不会重复存储）
 
-    - **file**: PDF文件
-
-    返回:
-    - **success**: 是否成功
-    - **filename**: 文件名
-    - **filepath**: 文件路径
-    - **total_pages**: 总页数
+@ocr_router.post("/upload", response_model=ApiResponse)
+async def upload_contract(
+        file: UploadFile = File(..., description="合同文件(PDF)")
+):
     """
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext != '.pdf':
-        return {"success": False, "error": "不是PDF文件"}
+    上传合同文件
+    1. 保存文件到本地
+    2. 创建数据库记录
+    3. 创建任务记录（含规则关联）并提交到队列
+    4. 立即返回 task_id 和 contract_id
+
+    任务在后台依次执行 OCR识别 -> 审计，可通过 /api/contracts/task/{contract_id} 查询进度
+    """
     try:
-        content = await file.read()
+        if not file.filename.lower().endswith('.pdf'):
+            return ApiResponse(success=False, message="仅支持 PDF 文件上传")
+
+        # 检查数据库中是否已存在同名文件
+        existing = get_contract_by_name(file.filename)
+        if existing:
+            existing_contract_id = existing["id"]
+            # 确保缓存目录存在并复制原始文件
+            cache_dir = ensure_cache_dir(existing_contract_id)
+            src_path = os.path.join(UPLOAD_DIR, file.filename)
+            dst_path = os.path.join(cache_dir, file.filename)
+            if os.path.exists(src_path) and not os.path.exists(dst_path):
+                shutil.copy2(src_path, dst_path)
+            task_id = add_task(
+                contract_id=existing_contract_id,
+                status="pending",
+            )
+            task_worker.submit_task(task_id)
+            return ApiResponse(
+                success=True,
+                message="文件已存在，已重新提交任务",
+                data={
+                    "contract_id": existing_contract_id,
+                    "task_id": task_id,
+                    "file_name": file.filename,
+                    "file_path": dst_path,
+                    "status": "pending",
+                    "existed": True,
+                }
+            )
+
+        # 不在数据库中
+
         filename = file.filename
         filepath = os.path.join(UPLOAD_DIR, filename)
         if not os.path.exists(filepath):
+            content = await file.read()
             with open(filepath, "wb") as f:
                 f.write(content)
 
-        # 获取PDF页数
-        doc = fitz.open(filepath)
-        total_pages = doc.page_count
-        doc.close()
-        res = {
-            "success": True,
-            "filename": file.filename,
-            "filepath": filepath,
-            "total_pages": total_pages
-        }
-        print(res)
-        return res
+        file_size = os.path.getsize(filepath)
+
+        # 创建数据库记录（数据库只存 file_name，不存路径）
+        contract_id = add_contract(
+            file_name=filename,
+            file_size=file_size,
+            file_type="pdf",
+            status="pending",
+        )
+
+        # 创建合同缓存目录，并将原始文件复制到缓存目录
+        cache_dir = ensure_cache_dir(contract_id)
+        dst_path = os.path.join(cache_dir, filename)
+        if os.path.exists(filepath) and not os.path.exists(dst_path):
+            shutil.copy2(filepath, dst_path)
+
+        task_id = add_task(
+            contract_id=contract_id,
+            status="pending",
+        )
+        task_worker.submit_task(task_id)
+
+        print(f"[Upload] 合同 {contract_id} 已提交，任务ID: {task_id}")
+
+        return ApiResponse(
+            success=True,
+            message="文件上传成功，已提交到处理队列",
+            data={
+                "contract_id": contract_id,
+                "task_id": task_id,
+                "file_name": filename,
+                "file_path": dst_path,
+                "file_size": file_size,
+                "status": "pending",
+                "existed": False,
+            }
+        )
 
     except Exception as e:
-        res = {"success": False, "error": str(e)}
-        print(res)
-        return res
+        return ApiResponse(success=False, message=f"上传失败: {str(e)}")
 
 
-async def extract_contract(
-        filepath: Optional[str] = Body(None, embed=True, description="文件路径")
+@ocr_router.get("/task/status/{task_id}", response_model=ApiResponse)
+async def get_task_status(task_id: int):
+    """
+    查询任务状态
+
+    - **task_id**: 任务ID
+
+    返回:
+    - **success**: 是否成功
+    - **data**: {"status": "pending/processing/completed/failed"}
+    """
+    try:
+        task = get_task_by_id(task_id)
+        if not task:
+            return ApiResponse(success=False, message="任务不存在")
+        return ApiResponse(success=True, message="获取成功", data={"status": task.get("status")})
+    except Exception as e:
+        return ApiResponse(success=False, message=f"获取失败: {str(e)}")
+
+
+@ocr_router.post("/get_audit_result")
+async def get_audit_results(
+        contract_id: int = Body(0, embed=True, description="合同ID"),
+        task_id: int = Body(0, embed=True, description="任务ID")
 ):
     """
     提取合同关键字段（带精确定位）
@@ -86,11 +165,9 @@ async def extract_contract(
     - **extract_info**: 提取的字段信息
     - **field_positions**: 字段位置信息（用于前端定位）
     """
-    if not filepath:
-        return {"success": False, "error": "文件路径为空"}
 
     # 调用合同字段提取函数
-    result = extract_contract_fields(filepath)
+    result = get_contract_fields(contract_id, task_id)
     # 转换位置信息为前端格式
     field_positions = result.get("field_positions", {})
     formatted_positions = {}
@@ -99,34 +176,16 @@ async def extract_contract(
         formatted_positions[field_name] = []
         for pos in positions:
             formatted_positions[field_name].append({
-                "page_num": pos.get("layout_idx", 0),
+                "page_num": pos.get("page_num", pos.get("layout_idx", 0)),
                 "bbox": pos.get("block_bbox", []),
-                "content": pos.get("block_content", "")[:100],  # 限制长度
+                "content": pos.get("block_content", "")[:100],
                 "match_type": pos.get("match_type", "unknown")
             })
 
     return {
         "success": True,
-        "extract_info": result.get("extract_info", {}),
+        "check_info": result.get("check_info", []),
         "field_positions": formatted_positions
     }
 
-
-ocr_router.post(
-    "/upload",
-    summary="上传文件",
-    description="""上传文件""",
-)(upload_pdf)
-
-ocr_router.post(
-    "/pdf_pages",
-    summary="PDF预览",
-    description="""PDF预览""",
-)(pdf_pages)
-
-ocr_router.post(
-    "/extract",
-    summary="关键信息提取",
-    description="""关键信息提取""",
-)(extract_contract)
 

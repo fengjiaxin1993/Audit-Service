@@ -25,3 +25,10 @@ requests>=2.31.0
 
 # 数据库
 sqlalchemy>=2.0.0
+
+# LangGraph — 合同审计流程编排
+langgraph>=0.2.0
+langgraph-checkpoint>=1.0.0
+
+# LLM 调用
+openai>=1.0.0

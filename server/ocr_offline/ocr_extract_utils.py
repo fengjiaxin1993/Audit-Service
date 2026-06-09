@@ -2,26 +2,43 @@ import logging
 import os
 from typing import Dict, List, Optional, Any
 import numpy as np
-
+import math
 from server.common.file_tools import load_cached_ocr_result, save_ocr_result
-from server.ocr.ocr_helper import _poly_to_list, _poly_to_bbox, _calculate_font_size, _calculate_alignment, \
+from server.ocr_offline.ocr_helper import _poly_to_list, _poly_to_bbox, _calculate_font_size, _calculate_alignment, \
     _generate_markdown_wysiwyg, _classify_text_by_size, _convert_pdf_to_images
-from server.ocr.single_ocr_engine import GlobalOcrEngine
+from server.ocr_offline.single_ocr_engine import GlobalOcrEngine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def is_water_mark(poly: List[List[int]], deg_score: int = 15):
+    # [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
+    x1, y1 = poly[0]
+    x2, y2 = poly[1]
+    abs_y = abs(y2 - y1)
+    abs_x = abs(x2 - x1)
+    rad = math.atan2(abs_y, abs_x)
+    deg = math.degrees(rad)
+    # print(deg)
+    if deg <= deg_score:
+        return False
+    return True
+
+
 def _ocr_single_image(img: np.ndarray, page_num: int = 0) -> Dict[str, Any]:
     """ocr识别单张图片 - 所见即所得版
     成功： 返回结构化数据
-    失败： 只返回{“error”：str(e)}
+    失败： 只返回{"error"：str(e)}
     """
 
     ocr_engine = GlobalOcrEngine.get_instance()
     try:
+        # 预处理：去除水印
+        # img = _remove_watermark(img)
+
         page_height, page_width = img.shape[:2]
-        # logger.info(f"图片尺寸: {page_width}x{page_height}")
+        print(f"图片尺寸: {page_width}x{page_height}")
         ocr_result = ocr_engine.predict(img)
         # logger.info(f"最终 ocr_result type={type(ocr_result)}")
 
@@ -41,6 +58,8 @@ def _ocr_single_image(img: np.ndarray, page_num: int = 0) -> Dict[str, Any]:
                 rec_scores_raw = first_item.get('rec_scores', [])
                 for idx in range(min(len(dt_polys), len(rec_texts_raw))):
                     poly = dt_polys[idx]
+                    if is_water_mark(poly):
+                        continue
                     text = rec_texts_raw[idx]
                     score = rec_scores_raw[idx] if idx < len(rec_scores_raw) else 0.0
 
@@ -115,7 +134,7 @@ def _ocr_single_image(img: np.ndarray, page_num: int = 0) -> Dict[str, Any]:
 def _ocr_pdf_file(file_path: str) -> Dict[str, Any]:
     """
     处理PDF文件。
-    失败： 只返回{“error”：str(e)}
+    失败： 只返回{"error"：str(e)}
     """
     if not os.path.exists(file_path):
         return {"error": f"文件不存在: {file_path}"}
@@ -164,7 +183,7 @@ def _call_ocr_parse(file_path: str) -> Optional[Dict[str, Any]]:
     }
 
 
-def process_file_ocr(file_path: str) -> Optional[Dict]:
+def process_file_ocr(file_path: str) -> Dict:
     """
     处理文件OCR
     先检查缓存，如果没有则调用_call_ocr_parse进行处理
