@@ -425,8 +425,8 @@
                     showToast('任务执行失败，请重新上传');
                     return;
                 }
-                // 等待2秒再查
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                // 等待30秒再查
+                await new Promise(resolve => setTimeout(resolve, 30000));
                 retries++;
             }
 
