@@ -1,13 +1,10 @@
 """
 任务仓库 - 任务和任务-规则关联表的数据访问层
 """
-from typing import List, Optional
-from sqlalchemy import desc
+from typing import List
 
-from server.audit.audit_process import RuleAuditResult
+from server.audit.audit_graph import RuleAuditResult
 from server.db.models.audit_result_model import AuditResultModel
-from server.db.models.base import get_shanghai_time
-from server.db.models.task_model import TaskModel
 from server.db.session import with_session
 
 

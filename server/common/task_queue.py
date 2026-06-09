@@ -21,9 +21,10 @@ from server.db.repository.contract_repository import get_contract_by_id, update_
 from server.db.repository.audit_rule_repository import list_audit_rules
 from server.common.file_tools import save_ocr_result, load_cached_ocr_result, ensure_cache_dir
 from server.ocr.ocr_extract import process_file_ocr_by_path
-from server.audit.audit_process import AuditRule, create_graph, GLOBAL_AUDIT_GRAPH
-from server.configs.basic_config import UPLOAD_DIR
-
+from server.audit.audit_graph import AuditRule, create_graph, GLOBAL_AUDIT_GRAPH
+from settings import Settings
+from server.logger_utils import build_logger
+logger = build_logger()
 
 class TaskWorker:
     """任务工作类：单线程从内存队列消费任务，执行 OCR + 审计两个阶段"""
@@ -38,7 +39,7 @@ class TaskWorker:
     def submit_task(self, task_id: int):
         """提交任务到内存队列"""
         self.task_queue.put(task_id)
-        print(f"[TaskWorker] 任务 {task_id} 已加入内存队列")
+        logger.info(f"[TaskWorker] 任务 {task_id} 已加入内存队列")
 
     def queue_size(self) -> int:
         """当前队列中待处理任务数"""
@@ -57,7 +58,7 @@ class TaskWorker:
             daemon=True,
         )
         self._worker_thread.start()
-        print("[TaskWorker] 工作线程已启动")
+        logger.info("[TaskWorker] 工作线程已启动")
 
     def stop(self):
         """停止工作线程（等待当前任务完成后退出）"""
@@ -66,12 +67,11 @@ class TaskWorker:
         self.task_queue.put(None)
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=30)
-        print("[TaskWorker] 工作线程已停止")
+        logger.info("[TaskWorker] 工作线程已停止")
 
     # ==================== 工作循环 ====================
 
     def _worker_loop(self):
-        print("[TaskWorker] 工作线程启动")
         while self._running:
             try:
                 task_id = self.task_queue.get(timeout=1.0)
@@ -82,12 +82,12 @@ class TaskWorker:
             if task_id is None:
                 break
 
-            print(f"[TaskWorker] 获取到待处理任务 {task_id}")
+            logger.info(f"[TaskWorker] 获取到待处理任务 {task_id}")
             try:
                 self._process_task(task_id)
             except Exception as e:
                 error_msg = f"{e}\n{traceback.format_exc()}"
-                print(f"[TaskWorker] 任务 {task_id} 处理异常: {error_msg}")
+                logger.error(f"[TaskWorker] 任务 {task_id} 处理异常: {error_msg}")
                 try:
                     update_task(task_id, status="failed", error_message=error_msg)
                 except Exception:
@@ -105,12 +105,11 @@ class TaskWorker:
         if not contract:
             raise Exception(f"合同 {task['contract_id']} 在数据库中不存在")
 
-        file_path = os.path.join(UPLOAD_DIR, contract["file_name"])
+        file_path = os.path.join(Settings.basic_settings.UPLOADS_DIR, contract["file_name"])
         if not os.path.exists(file_path):
             raise Exception(f"合同文件不存在: {file_path}")
 
         contract_id = task["contract_id"]
-        print(f"[Task {task_id}] contract_id={contract_id}, file={file_path}")
         ensure_cache_dir(contract_id)
 
         ocr_result = self._run_ocr(task_id, contract_id, file_path)
@@ -120,7 +119,7 @@ class TaskWorker:
 
     def _run_ocr(self, task_id: int, contract_id: int, file_path: str) -> dict:
         """执行 OCR：优先缓存，缓存未命中则调用 OCR 服务并缓存结果"""
-        print(f"[Task {task_id}] 阶段一：OCR识别开始")
+        logger.info(f"[Task {task_id}] 阶段一：OCR识别开始")
         update_task(task_id, status="ocr_processing", ocr_status="processing")
         update_contract(contract_id, status="processing")
 
@@ -128,7 +127,7 @@ class TaskWorker:
         try:
             result = load_cached_ocr_result(contract_id)
             if result:
-                print(f"[Task {task_id}] 使用已有文件缓存")
+                logger.info(f"[Task {task_id}] 使用已有文件缓存")
             else:
                 result = process_file_ocr_by_path(file_path)
                 if not result or result.get("error"):
@@ -139,10 +138,10 @@ class TaskWorker:
                     result.get("markdown_text", ""),
                     result.get("structure_json_result", {}),
                 )
-                print(f"[Task {task_id}] OCR结果已保存到文件缓存")
+                logger.info(f"[Task {task_id}] OCR结果已保存到文件缓存")
 
             t1 = datetime.now()
-            print(f"[Task {task_id}] OCR完成，耗时: {(t1 - t0).total_seconds():.1f}s")
+            logger.info(f"[Task {task_id}] OCR完成，耗时: {(t1 - t0).total_seconds():.1f}s")
             update_task(task_id, ocr_status="done", ocr_start_time=t0, ocr_end_time=t1)
             update_contract(contract_id, status="done")
             return result
@@ -161,7 +160,7 @@ class TaskWorker:
 
     def _run_audit(self, task_id: int, contract_id: int, ocr_result: dict):
         """执行审计：加载规则 -> LangGraph 审计 -> 保存结果"""
-        print(f"[Task {task_id}] 阶段二：审计开始")
+        logger.info(f"[Task {task_id}] 阶段二：审计开始")
         update_task(task_id, status="audit_processing", audit_status="processing")
 
         t0 = datetime.now()
@@ -169,7 +168,7 @@ class TaskWorker:
             rules = list_audit_rules()
             if not rules:
                 raise Exception("没有可用的审计规则")
-            print(f"[Task {task_id}] 使用 {len(rules)} 条审计规则")
+            logger.info(f"[Task {task_id}] 使用 {len(rules)} 条审计规则")
 
             rule_ids = [r["id"] for r in rules]
             result_ids = batch_add_audit_results(task_id, contract_id, rule_ids)
@@ -211,7 +210,7 @@ class TaskWorker:
                 )
 
             t1 = datetime.now()
-            print(f"[Task {task_id}] 审计完成，耗时: {(t1 - t0).total_seconds():.1f}s")
+            logger.info(f"[Task {task_id}] 审计完成，耗时: {(t1 - t0).total_seconds():.1f}s")
 
             update_task(
                 task_id, status="completed", audit_status="done",
@@ -219,7 +218,7 @@ class TaskWorker:
             )
 
             pass_count = sum(1 for r in single_results if r.is_compliant)
-            print(f"[Task {task_id}] 任务完成！合规: {pass_count}, 不合规: {len(single_results) - pass_count}")
+            logger.info(f"[Task {task_id}] 任务完成！合规: {pass_count}, 不合规: {len(single_results) - pass_count}")
 
         except Exception as e:
             t1 = datetime.now()

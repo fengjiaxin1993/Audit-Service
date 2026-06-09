@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 
 def find_text_positions_in_json(clause_text: str, doc_id_list: List[str], json_result: Dict) -> List[Dict]:
@@ -68,7 +68,6 @@ def find_text_positions_in_json(clause_text: str, doc_id_list: List[str], json_r
     clause_text_clean = '\n'.join(line.strip() for line in clause_text.split('\n'))
 
     keywords_exact = generate_keywords(clause_text_clean, normalized=False)
-    keywords_normalized = generate_keywords(clause_text_clean, normalized=True)
 
     matches = []
     matched_block_ids = set()

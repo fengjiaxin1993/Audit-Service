@@ -3,14 +3,13 @@
 
 import os
 import base64
-import logging
 from typing import Dict, Any
 import fitz  # PyMuPDF
 import io
 from PIL import Image
-from server.configs.basic_config import PDF_DPI
-
-logger = logging.getLogger(__name__)
+from settings import Settings
+from server.logger_utils import build_logger
+logger = build_logger()
 
 
 def pdf_page_to_base64(doc: fitz.Document, page_num: int, zoom: float = 1.0) -> tuple:
@@ -21,7 +20,7 @@ def pdf_page_to_base64(doc: fitz.Document, page_num: int, zoom: float = 1.0) -> 
     rect = page.rect
 
     # 计算矩阵（DPI缩放）
-    matrix = fitz.Matrix(zoom * PDF_DPI / 72, zoom * PDF_DPI / 72)
+    matrix = fitz.Matrix(zoom * Settings.basic_settings.PDF_DPI / 72, zoom * Settings.basic_settings.PDF_DPI / 72)
 
     # 渲染页面
     pix = page.get_pixmap(matrix=matrix)
@@ -35,14 +34,14 @@ def pdf_page_to_base64(doc: fitz.Document, page_num: int, zoom: float = 1.0) -> 
     img_base64 = base64.b64encode(buffer.getvalue()).decode()
 
     # OCR 在 150 DPI 下运行，返回 OCR 参考尺寸用于前端坐标换算
-    ocr_zoom = PDF_DPI / 72.0
+    ocr_zoom = Settings.basic_settings.PDF_DPI / 72.0
     ocr_width = rect.width * ocr_zoom
     ocr_height = rect.height * ocr_zoom
 
     return img_base64, pix.width, pix.height, ocr_width, ocr_height
 
 
-def get_pdf_pages(filepath: str, zoom_factor: float = 2.0) -> Dict[str, Any]:
+def get_pdf_pages(filepath: str, zoom_factor: float = 1.0) -> Dict[str, Any]:
     """
     获取PDF所有页面的图片（base64编码）和尺寸信息
 

@@ -3,7 +3,7 @@ from typing import List, Optional
 from sqlalchemy import desc
 from server.db.models.contract_model import ContractModel
 from server.db.session import with_session
-from server.configs.basic_config import UPLOAD_DIR
+from settings import Settings
 
 
 @with_session
@@ -118,7 +118,7 @@ def contract_exists(session, contract_id: int) -> bool:
 
 def _contract_to_dict(c: ContractModel) -> dict:
     """将 ContractModel 转换为字典（数据库不存路径，动态拼接）"""
-    file_path = os.path.join(UPLOAD_DIR, c.file_name) if c.file_name else ""
+    file_path = os.path.join(Settings.basic_settings.UPLOADS_DIR, c.file_name) if c.file_name else ""
     return {
         "id": c.id,
         "file_name": c.file_name,

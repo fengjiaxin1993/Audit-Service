@@ -3,6 +3,22 @@ from sqlalchemy import desc
 from server.db.models.audit_rule_model import AuditRuleModel
 from server.db.session import with_session
 
+# 默认初始化规则列表
+DEFAULT_AUDIT_RULES = [
+    {
+        "name": "法律法规判断",
+        "description": "法律法规判断",
+        "chapter_keywords": ["总则"],
+        "judge_logic": "判断引用的法规是否正确",
+    },
+    {
+        "name": "厂站情况判断",
+        "description": "厂站情况判断",
+        "chapter_keywords": ["系统概况"],
+        "judge_logic": "厂站情况描述是否齐全，是否详细",
+    }
+]
+
 
 @with_session
 def add_audit_rule(
@@ -121,3 +137,55 @@ def audit_rule_exists(session, rule_id: int) -> bool:
     检查审计规则是否存在
     """
     return session.query(AuditRuleModel).filter_by(id=rule_id).first() is not None
+
+
+@with_session
+def get_rule_by_name(session, name: str) -> Optional[AuditRuleModel]:
+    """
+    根据名称查找规则，返回ORM对象（用于内部比较）
+    """
+    return session.query(AuditRuleModel).filter_by(name=name).first()
+
+
+@with_session
+def init_default_rules(session) -> dict:
+    """
+    导入默认规则：
+    - 如果规则名称已存在且内容完全一致，则跳过
+    - 如果规则名称已存在但内容不同，则更新
+    - 如果规则名称不存在，则新增
+
+    返回: {"created": int, "updated": int, "skipped": int}
+    """
+    created = 0
+    updated = 0
+    skipped = 0
+
+    for rule_data in DEFAULT_AUDIT_RULES:
+        existing = session.query(AuditRuleModel).filter_by(name=rule_data["name"]).first()
+        if existing:
+            # 比较关键字段是否完全一致
+            same_desc = (existing.description or "") == (rule_data["description"] or "")
+            same_keywords = (existing.chapter_keywords or []) == (rule_data["chapter_keywords"] or [])
+            same_logic = (existing.judge_logic or "") == (rule_data["judge_logic"] or "")
+
+            if same_desc and same_keywords and same_logic:
+                skipped += 1
+            else:
+                existing.description = rule_data["description"]
+                existing.chapter_keywords = rule_data["chapter_keywords"]
+                existing.judge_logic = rule_data["judge_logic"]
+                session.add(existing)
+                updated += 1
+        else:
+            m = AuditRuleModel(
+                name=rule_data["name"],
+                description=rule_data["description"],
+                chapter_keywords=rule_data["chapter_keywords"],
+                judge_logic=rule_data["judge_logic"],
+            )
+            session.add(m)
+            created += 1
+
+    session.commit()
+    return {"created": created, "updated": updated, "skipped": skipped}

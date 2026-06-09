@@ -2,40 +2,20 @@ import json
 import operator
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 from pydantic import BaseModel
-from typing import List, Annotated, Optional
+from typing import List, Annotated
+
+from server.audit.model import AuditRule, RuleAuditResult
+from server.utils import get_ChatOpenAI
+from settings import Settings
+
 
 # ====================== 全局配置：LLM最大并发控制 ======================
-MAX_LLM_CONCURRENT = 2  # 可自定义：比如同时最多3个LLM调用
-llm_semaphore = threading.Semaphore(MAX_LLM_CONCURRENT)  # 全局信号量，全任务共享
-executor = ThreadPoolExecutor(max_workers=MAX_LLM_CONCURRENT)  # 线程池和并发对齐
+llm_semaphore = threading.Semaphore(Settings.basic_settings.MAX_CONCURRENT_AUDIT_LLM)  # 全局信号量，全任务共享
+executor = ThreadPoolExecutor(max_workers=Settings.basic_settings.MAX_CONCURRENT_AUDIT_LLM)  # 线程池和并发对齐
 
-
-# ====================== 数据模型 ======================
-class AuditRule(BaseModel):
-    id: int  # 规则唯一ID
-    name: str  # 规则名称（简短描述）
-    description: str  # 规则详细描述（用于提示大模型）
-    chapter_keywords: List[str]
-    judge_logic: str  # 判断逻辑
-
-
-class RuleAuditResult(BaseModel):
-    contract_id: int  # 合同ID
-    rule_id: int  # 规则ID
-    rule_name: str  # 规则名称
-    rule_description: str  # 规则详细描述（用于提示大模型）
-    rule_judge_logic: str  # 判断逻辑
-    related_chapters: List[str]  # 引用的相关章节名
-    related_text: str  # 引用的相关原文
-    related_doc_ids: List[str]  # 引用的相关文档ID
-    is_compliant: bool  # 是否合规
-    conclusion: str  # 结论描述
-    reasoning: str  # 判断理由/解释
-    origin_text: str  # 从原文中找出相关的内容
 
 
 class AuditState(BaseModel):
@@ -47,12 +27,13 @@ class AuditState(BaseModel):
 
 
 # ====================== LLM实例 ======================
-llm = ChatOpenAI(
-    api_key="sk-445d4654ee8e4067b447172154f0a273",
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-    model="qwen3-32b",
-    extra_body={"enable_thinking": False}
-)
+llm = get_ChatOpenAI(
+            model_name=Settings.model_settings.DEFAULT_LLM_MODEL,
+            temperature=Settings.model_settings.TEMPERATURE,
+            max_tokens=Settings.model_settings.MAX_TOKENS,
+            callbacks=[],
+
+        )
 
 
 # 获取相关文件内容

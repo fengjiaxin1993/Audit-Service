@@ -3,9 +3,6 @@
 """
 from typing import List, Optional
 from sqlalchemy import desc
-
-from server.db.models.audit_result_model import AuditResultModel
-from server.db.models.base import get_shanghai_time
 from server.db.models.task_model import TaskModel
 from server.db.session import with_session
 

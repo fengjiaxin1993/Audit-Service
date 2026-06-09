@@ -479,6 +479,7 @@
                 <button class="btn btn-secondary" onclick="loadRules()">🔄 刷新</button>
             </div>
             <div class="toolbar-right">
+                <button class="btn btn-primary" onclick="initDefaultRules()" id="btnInitDefault" style="background: #ff9800;">📥 初始化规则</button>
                 <button class="btn btn-success" onclick="showAddModal()">➕ 新建规则</button>
             </div>
         </div>
@@ -544,7 +545,7 @@
     <div id="toastContainer"></div>
 
     <script>
-        const API_BASE_URL = 'http://localhost:8000';
+        const API_BASE_URL = 'http://localhost:7861';
         let allRules = [];
         let currentKeywords = [];
 
@@ -780,6 +781,35 @@
                 closeModal();
             }
         });
+
+        // 初始化默认规则
+        async function initDefaultRules() {
+            if (!confirm('将导入默认审计规则（已存在的同名规则会被更新，完全一致则跳过）。\n\n确定要继续吗？')) {
+                return;
+            }
+
+            const btn = document.getElementById('btnInitDefault');
+            btn.disabled = true;
+            btn.textContent = '⏳ 导入中...';
+
+            try {
+                const result = await apiRequest('/api/rules/init_default', {
+                    method: 'POST'
+                });
+
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    loadRules();
+                } else {
+                    showToast(result.message || '初始化失败', 'error');
+                }
+            } catch (error) {
+                showToast('初始化失败: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📥 初始化规则';
+            }
+        }
 
         // 页面加载时初始化
         document.addEventListener('DOMContentLoaded', function() {

@@ -7,17 +7,15 @@
 """
 import os
 import json
-import logging
 from typing import Dict, Optional
-
-from server.configs.basic_config import CACHE_DIR
-
-logger = logging.getLogger(__name__)
+from settings import Settings
+from server.logger_utils import build_logger
+logger = build_logger()
 
 
 def get_contract_cache_dir(contract_id: int) -> str:
     """获取合同 OCR 缓存目录路径"""
-    cache_dir = os.path.join(CACHE_DIR, str(contract_id))
+    cache_dir = os.path.join(Settings.basic_settings.CACHE_DATA_PATH, str(contract_id))
     return cache_dir
 
 
@@ -70,8 +68,6 @@ def load_cached_ocr_result(contract_id: int) -> Optional[Dict]:
                 markdown_text = f.read()
             with open(structure_path, 'r', encoding='utf-8') as f:
                 structure_json_result = json.load(f)
-
-            logger.info(f"加载 OCR 缓存成功: contract_id={contract_id}")
             return {
                 "locate_json_result": locate_json_result,
                 "markdown_text": markdown_text,

@@ -12,7 +12,7 @@ from server.db.repository.audit_rule_repository import (
     list_audit_rules,
     update_audit_rule,
     delete_audit_rule,
-    audit_rule_exists,
+    init_default_rules,
 )
 
 
@@ -126,3 +126,31 @@ async def remove_rule(rule_id: int):
         return ApiResponse(success=False, message="规则不存在或删除失败")
     except Exception as e:
         return ApiResponse(success=False, message=f"删除失败: {str(e)}")
+
+
+@audit_rule_router.post("/init_default", response_model=ApiResponse)
+async def init_default():
+    """
+    导入默认规则：
+    - 名称相同且内容完全一致则跳过
+    - 名称相同但内容不同则更新
+    - 名称不存在则新增
+    """
+    try:
+        result = init_default_rules()
+        msg_parts = []
+        if result["created"] > 0:
+            msg_parts.append(f"新增 {result['created']} 条")
+        if result["updated"] > 0:
+            msg_parts.append(f"更新 {result['updated']} 条")
+        if result["skipped"] > 0:
+            msg_parts.append(f"跳过 {result['skipped']} 条（内容一致）")
+        if not msg_parts:
+            msg_parts.append("无变化")
+        return ApiResponse(
+            success=True,
+            message="初始化完成: " + "，".join(msg_parts),
+            data=result,
+        )
+    except Exception as e:
+        return ApiResponse(success=False, message=f"初始化失败: {str(e)}")

@@ -4,13 +4,13 @@ from typing import Optional
 from fastapi import APIRouter, Body, UploadFile, File
 
 from server.api_server.utils import ApiResponse
+from server.audit.extract_audit import get_audit_fields_from_db
 from server.common.file_tools import ensure_cache_dir
 from server.common.pdf_tools import get_pdf_pages
 from server.common.task_queue import task_worker
-from server.configs.basic_config import UPLOAD_DIR
-from server.contract.contract_extract import get_contract_fields
-from server.db.repository import get_contract_by_name, add_task, add_contract
-from server.db.repository.task_repository import get_task_by_id
+from settings import Settings
+from server.db.repository.contract_repository import get_contract_by_name, add_contract
+from server.db.repository.task_repository import get_task_by_id, add_task
 
 ocr_router = APIRouter(prefix="/api", tags=["OCR文件识别"])
 
@@ -57,7 +57,7 @@ async def upload_contract(
             existing_contract_id = existing["id"]
             # 确保缓存目录存在并复制原始文件
             cache_dir = ensure_cache_dir(existing_contract_id)
-            src_path = os.path.join(UPLOAD_DIR, file.filename)
+            src_path = os.path.join(Settings.basic_settings.UPLOADS_DIR, file.filename)
             dst_path = os.path.join(cache_dir, file.filename)
             if os.path.exists(src_path) and not os.path.exists(dst_path):
                 shutil.copy2(src_path, dst_path)
@@ -82,7 +82,7 @@ async def upload_contract(
         # 不在数据库中
 
         filename = file.filename
-        filepath = os.path.join(UPLOAD_DIR, filename)
+        filepath = os.path.join(Settings.basic_settings.UPLOADS_DIR, filename)
         if not os.path.exists(filepath):
             content = await file.read()
             with open(filepath, "wb") as f:
@@ -167,7 +167,7 @@ async def get_audit_results(
     """
 
     # 调用合同字段提取函数
-    result = get_contract_fields(contract_id, task_id)
+    result = get_audit_fields_from_db(contract_id, task_id)
     # 转换位置信息为前端格式
     field_positions = result.get("field_positions", {})
     formatted_positions = {}

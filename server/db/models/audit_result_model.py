@@ -5,7 +5,6 @@ from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey, Bool
 from sqlalchemy.dialects.mysql import JSON
 
 from server.db.base import Base
-from server.db.models.base import get_shanghai_time
 
 
 class AuditResultModel(Base):

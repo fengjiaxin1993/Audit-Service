@@ -12,8 +12,7 @@ from server.db.repository.contract_repository import (
     delete_contract,
 )
 from server.common.file_tools import delete_ocr_cache
-from server.configs.basic_config import UPLOAD_DIR
-
+from settings import Settings
 
 
 
@@ -24,7 +23,7 @@ contract_router = APIRouter(prefix="/api/contracts", tags=["合同管理"])
 
 def _get_contract_file_path(file_name: str) -> str:
     """根据文件名拼接上传文件的完整路径"""
-    return os.path.join(UPLOAD_DIR, file_name)
+    return os.path.join(Settings.basic_settings.UPLOADS_DIR, file_name)
 
 
 @contract_router.get("/list", response_model=ApiResponse)
