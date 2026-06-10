@@ -66,7 +66,9 @@ class TaskWorker:
         # 向队列放入一个哨兵值，唤醒阻塞在 get() 上的线程
         self.task_queue.put(None)
         if self._worker_thread and self._worker_thread.is_alive():
-            self._worker_thread.join(timeout=30)
+            # 缩短等待时间到 3 秒，避免长时间阻塞关闭流程
+            # worker 线程是 daemon=True，主线程退出后会被强制终止
+            self._worker_thread.join(timeout=3)
         logger.info("[TaskWorker] 工作线程已停止")
 
     # ==================== 工作循环 ====================

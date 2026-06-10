@@ -11,3 +11,6 @@ models/
 tests/
 *.yaml
 .gitignore
+dist/
+init_data/
+env/

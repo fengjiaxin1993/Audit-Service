@@ -50,25 +50,25 @@ class BasicSettings(BaseFileSettings):
     PDF_DPI: int = 200
     """OCR 使用的 DPI（控制 OCR 精度和速度）"""
 
-    RAPID_DOC_DET_MODEL_PATH :str = str(SERVICE_ROOT / "models/rapid_doc/ch_PP-OCRv5_mobile_det.onnx")
+    RAPID_DOC_DET_MODEL_PATH :str = str(SERVICE_ROOT / "data/models/rapid_doc/ch_PP-OCRv5_mobile_det.onnx")
     """rapid_doc 检测模型路径"""
 
-    RAPID_DOC_REC_MODEL_PATH :str = str(SERVICE_ROOT / "models/rapid_doc/ch_PP-OCRv5_rec_mobile_infer.onnx")
+    RAPID_DOC_REC_MODEL_PATH :str = str(SERVICE_ROOT / "data/models/rapid_doc/ch_PP-OCRv5_rec_mobile_infer.onnx")
     """rapid_doc 识别模型路径"""
 
-    RAPID_DOC_CLS_MODEL_PATH: str = str(SERVICE_ROOT / "models/rapid_doc/ch_ppocr_mobile_v2.0_cls_mobile.onnx")
+    RAPID_DOC_CLS_MODEL_PATH: str = str(SERVICE_ROOT / "data/models/rapid_doc/ch_ppocr_mobile_v2.0_cls_mobile.onnx")
     """rapid_doc 识别模型路径"""
 
-    RAPID_DOC_LAYOUT_MODEL_PATH  :str = str(SERVICE_ROOT / "models/rapid_doc/pp_doclayoutv2.onnx")
+    RAPID_DOC_LAYOUT_MODEL_PATH  :str = str(SERVICE_ROOT / "data/models/rapid_doc/pp_doclayoutv2.onnx")
     """布局模型路径"""
 
-    RAPID_DOC_PADDLE_CLS_MODEL_PATH  :str = str(SERVICE_ROOT / "models/rapid_doc/paddle_cls.onnx")
+    RAPID_DOC_PADDLE_CLS_MODEL_PATH  :str = str(SERVICE_ROOT / "data/models/rapid_doc/paddle_cls.onnx")
     """表格识别路径"""
 
-    RAPID_DOC_UNET_MODEL_PATH  :str = str(SERVICE_ROOT / "models/rapid_doc/unet.onnx")
+    RAPID_DOC_UNET_MODEL_PATH  :str = str(SERVICE_ROOT / "data/models/rapid_doc/unet.onnx")
     """表格识别路径"""
 
-    RAPID_DOC_SLANET_MODEL_PATH :str = str(SERVICE_ROOT / "models/rapid_doc/slanet-plus.onnx")
+    RAPID_DOC_SLANET_MODEL_PATH :str = str(SERVICE_ROOT / "data/models/rapid_doc/slanet-plus.onnx")
     """表格识别路径"""
 
     DEFAULT_BIND_HOST: str = "0.0.0.0" if sys.platform != "win32" else "127.0.0.1"
