@@ -23,9 +23,6 @@ def startup_event():
     logger.info("服务启动，开始预热模型...")
     # 同步等待预热完成，确保服务启动后再接收请求
     preload_model()
-    file_path = os.path.join(Settings.basic_settings.DATA_PATH, "test", "test.pdf")
-    result = pdf2info(file_path)
-    logger.info("推理初始化...")
 
 
 
