@@ -3,8 +3,8 @@ import sys
 import typing as t
 from pydantic_settings_file import *
 
-# chatchat 数据目录，必须通过环境变量设置。如未设置则自动使用当前目录。
-CHATCHAT_ROOT = Path(".").resolve()
+
+SERVICE_ROOT = Path(".").resolve()
 
 
 class BasicSettings(BaseFileSettings):
@@ -12,7 +12,7 @@ class BasicSettings(BaseFileSettings):
     服务器基本配置信息
     """
 
-    model_config = SettingsConfigDict(yaml_file=CHATCHAT_ROOT / "basic_settings.yaml")
+    model_config = SettingsConfigDict(yaml_file=SERVICE_ROOT / "basic_settings.yaml")
 
     # @computed_field
     @cached_property
@@ -24,7 +24,7 @@ class BasicSettings(BaseFileSettings):
     @cached_property
     def DATA_PATH(self) -> Path:
         """用户数据根目录"""
-        p = CHATCHAT_ROOT / "data"
+        p = SERVICE_ROOT / "data"
         return p
 
     # @computed_field
@@ -34,15 +34,14 @@ class BasicSettings(BaseFileSettings):
         p = self.DATA_PATH / "cache"
         return p
 
-
-    # @computed_field
     @cached_property
     def UPLOADS_DIR(self) -> Path:
-        """文件上传目录"""
+        """OCR缓存目录"""
         p = self.DATA_PATH / "uploads"
         return p
 
-    SQLALCHEMY_DATABASE_URI: str = "sqlite:///" + str(CHATCHAT_ROOT / "data/info.db")
+
+    SQLALCHEMY_DATABASE_URI: str = "sqlite:///" + str(SERVICE_ROOT / "data/info.db")
     """知识库信息数据库连接URI"""
 
     MAX_CONCURRENT_AUDIT_LLM: int = 2
@@ -51,8 +50,26 @@ class BasicSettings(BaseFileSettings):
     PDF_DPI: int = 200
     """OCR 使用的 DPI（控制 OCR 精度和速度）"""
 
-    OCR_BASE_URL: str = "http://localhost:7840"
-    """OCR 使用的 DPI（控制 OCR 精度和速度）"""
+    RAPID_DOC_DET_MODEL_PATH :str = str(SERVICE_ROOT / "models/rapid_doc/ch_PP-OCRv5_mobile_det.onnx")
+    """rapid_doc 检测模型路径"""
+
+    RAPID_DOC_REC_MODEL_PATH :str = str(SERVICE_ROOT / "models/rapid_doc/ch_PP-OCRv5_rec_mobile_infer.onnx")
+    """rapid_doc 识别模型路径"""
+
+    RAPID_DOC_CLS_MODEL_PATH: str = str(SERVICE_ROOT / "models/rapid_doc/ch_ppocr_mobile_v2.0_cls_mobile.onnx")
+    """rapid_doc 识别模型路径"""
+
+    RAPID_DOC_LAYOUT_MODEL_PATH  :str = str(SERVICE_ROOT / "models/rapid_doc/pp_doclayoutv2.onnx")
+    """布局模型路径"""
+
+    RAPID_DOC_PADDLE_CLS_MODEL_PATH  :str = str(SERVICE_ROOT / "models/rapid_doc/paddle_cls.onnx")
+    """表格识别路径"""
+
+    RAPID_DOC_UNET_MODEL_PATH  :str = str(SERVICE_ROOT / "models/rapid_doc/unet.onnx")
+    """表格识别路径"""
+
+    RAPID_DOC_SLANET_MODEL_PATH :str = str(SERVICE_ROOT / "models/rapid_doc/slanet-plus.onnx")
+    """表格识别路径"""
 
     DEFAULT_BIND_HOST: str = "0.0.0.0" if sys.platform != "win32" else "127.0.0.1"
     """
@@ -68,7 +85,7 @@ class BasicSettings(BaseFileSettings):
         for p in [
             self.DATA_PATH,
             self.CACHE_DATA_PATH,
-            self.UPLOADS_DIR
+            self.UPLOADS_DIR,
         ]:
             p.mkdir(parents=True, exist_ok=True)
 
@@ -104,7 +121,7 @@ class PlatformConfig(MyBaseModel):
 class ApiModelSettings(BaseFileSettings):
     """模型配置项"""
 
-    model_config = SettingsConfigDict(yaml_file=CHATCHAT_ROOT / "model_settings.yaml")
+    model_config = SettingsConfigDict(yaml_file=SERVICE_ROOT / "model_settings.yaml")
 
     DEFAULT_LLM_MODEL: str = "qwen2.5:0.5b"
     """默认选用的 LLM 名称"""
@@ -172,7 +189,7 @@ class ApiModelSettings(BaseFileSettings):
 
 
 class SettingsContainer:
-    CHATCHAT_ROOT = CHATCHAT_ROOT
+    SERVICE_ROOT = SERVICE_ROOT
 
     basic_settings: BasicSettings = settings_property(BasicSettings())
     model_settings: ApiModelSettings = settings_property(ApiModelSettings())

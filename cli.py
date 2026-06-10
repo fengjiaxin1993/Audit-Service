@@ -20,7 +20,7 @@ def main():
 @main.command("init", help="项目初始化")
 def init():
     Settings.set_auto_reload(False)
-    logger.info(f"开始初始化项目数据目录：{Settings.CHATCHAT_ROOT}")
+    logger.info(f"开始初始化项目数据目录：{Settings.SERVICE_ROOT}")
     Settings.basic_settings.make_dirs()
     logger.info("创建所有数据目录：成功。")
     logger.info("开始创建相关表信息")

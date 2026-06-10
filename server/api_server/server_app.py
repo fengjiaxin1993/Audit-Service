@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse, RedirectResponse
 
+from server.ocr.ocr_service import startup_event
 from server.utils import MakeFastAPIOffline
 from settings import Settings
 from server.api_server.main_routes import ocr_router
@@ -12,7 +13,7 @@ from server.api_server.audit_rule_routes import audit_rule_router
 from server.api_server.audit_result_routes import audit_result_router
 from server.api_server.contract_routes import contract_router
 from server.api_server.task_routes import task_router
-from server.common.task_queue import stop_task_workers
+from server.common.task_queue import stop_task_workers, start_task_workers
 
 
 def create_app():
@@ -30,6 +31,12 @@ def create_app():
     def shutdown():
         """服务关闭时停止 TaskWorker 线程"""
         stop_task_workers()
+
+    @app.on_event("startup")
+    def on_startup():
+        """服务启动时执行初始化"""
+        start_task_workers()
+        startup_event()
 
     @app.get("/index",summary="文档展示页面", include_in_schema=False)
     async def root():
@@ -50,6 +57,10 @@ def create_app():
     @app.get("/docs", summary="swagger 文档", include_in_schema=False)
     async def document():
         return RedirectResponse(url="/docs")
+
+    @app.get("/", summary="界面首页", include_in_schema=False)
+    async def document():
+        return RedirectResponse(url="/index")
 
     app.include_router(ocr_router)
     app.include_router(audit_rule_router)

@@ -1,8 +1,13 @@
 # Apply pathlib patches before any other imports to fix WindowsPath issues
 import uvicorn
 import logging
+# 屏蔽第三方库的冗余日志
 logging.getLogger("httpx").setLevel(logging.WARNING)
-from server.common.task_queue import start_task_workers
+logging.getLogger("rapid_doc").setLevel(logging.WARNING)
+logging.getLogger("rapidocr").setLevel(logging.WARNING)
+logging.getLogger("rapid_table").setLevel(logging.WARNING)
+logging.getLogger("rapid_layout").setLevel(logging.WARNING)
+logging.getLogger("onnxruntime").setLevel(logging.WARNING)
 from server.logger_utils import build_logger
 import click
 from settings import Settings
@@ -12,10 +17,7 @@ logger = build_logger()
 
 def run_api_server():
     logger.info(f"Api MODEL_PLATFORMS: {Settings.model_settings.MODEL_PLATFORMS}")
-
     app = create_app()
-    start_task_workers()
-
     host = Settings.basic_settings.API_SERVER["host"]
     port = Settings.basic_settings.API_SERVER["port"]
     logger.info(f"服务地址:  http://{host}:{port}")

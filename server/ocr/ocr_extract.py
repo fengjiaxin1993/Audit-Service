@@ -1,37 +1,41 @@
+import asyncio
 import json
+import os
 from typing import Dict, Any
 
 import requests
+
+from server.ocr.ocr_service import pdf2info
 from settings import Settings
 from server.logger_utils import build_logger
 logger = build_logger()
 
 
-def _get_ocr_info(file_path: str) -> dict:
-    """测试通过文件路径解析"""
-    data = {
-        "file_path": file_path,
-    }
-
-    response = requests.post(f"{Settings.basic_settings.OCR_BASE_URL}/api/parse/pdf2info", json=data)
-    result = response.json()
-    return result
-
-
-def _call_ocr_parse(file_path: str) -> Dict[str, Any]:
-    """
-    OCR解析文件,完成合并markdown功能，对外开放
-
-    Args:
-        file_path: 文件路径
-    """
-    res_dic = _get_ocr_info(file_path)
-
-    return {
-        "locate_json_result": json.loads(res_dic["layoutParsingResults"]),
-        "markdown_text": res_dic["markdown"],
-        "structure_json_result": json.loads(res_dic["structureJsonResults"])
-    }
+# def _get_ocr_info(file_path: str) -> dict:
+#     """测试通过文件路径解析"""
+#     data = {
+#         "file_path": file_path,
+#     }
+#
+#     response = requests.post(f"{Settings.basic_settings.OCR_BASE_URL}/api/parse/pdf2info", json=data)
+#     result = response.json()
+#     return result
+#
+#
+# def _call_ocr_parse(file_path: str) -> Dict[str, Any]:
+#     """
+#     OCR解析文件,完成合并markdown功能，对外开放
+#
+#     Args:
+#         file_path: 文件路径
+#     """
+#     res_dic = _get_ocr_info(file_path)
+#
+#     return {
+#         "locate_json_result": json.loads(res_dic["layoutParsingResults"]),
+#         "markdown_text": res_dic["markdown"],
+#         "structure_json_result": json.loads(res_dic["structureJsonResults"])
+#     }
 
 
 def process_file_ocr_by_path(file_path: str) -> Dict:
@@ -49,9 +53,16 @@ def process_file_ocr_by_path(file_path: str) -> Dict:
             "structure_json_result": dict
         }
     """
+    if not os.path.exists(file_path):
+        return {'error': f"文件不存在: {file_path}"}
+
+    file_ext = os.path.splitext(file_path)[1].lower()
+    if file_ext != '.pdf':
+        return {'error': f"不支持该文件格式: {file_path}"}
+
     try:
         logger.info(f"开始OCR处理(无缓存): {file_path}")
-        result = _call_ocr_parse(file_path)
+        result = pdf2info(file_path)
         return result
     except Exception as e:
         logger.error(f"OCR处理异常: {str(e)}")

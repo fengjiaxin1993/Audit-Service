@@ -210,6 +210,7 @@ MODEL_PLATFORMS:
 conda create -n ICDO-RNV python=3.11
 conda activate ICDO-RNV
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
+pip install rapid-doc[cpu] -i https://mirrors.aliyun.com/pypi/simple
 ```
 
 ### 2. 初始化数据库（首次运行）
