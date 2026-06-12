@@ -6,8 +6,10 @@ __pycache__/
 
 # IDE
 .idea/
-data/
-models/
+data/models/
+src/audit_service/data/models/
+src/audit_service/data/cache/
+src/audit_service/data/uploads/
 tests/
 *.yaml
 .gitignore

@@ -1,13 +1,12 @@
-[tool.poetry]
-name = "audit"
+[project]
+name = "audit_service"
 version = "1.0.0"
 description = "审计服务"
-authors = ["feng jiaxin"]
-readme = "README.md"
-packages = [
-    {include = "server"},
-    {include = "*.py"}
+authors = [
+    {name = "fengjiaxin1993",email = "1922623048@qq.com"}
 ]
+readme = "README.md"
+
 
 [tool.poetry.dependencies]
 python = "^3.9"
@@ -50,13 +49,20 @@ black = "^24.0.0"
 flake8 = "^7.0.0"
 
 [tool.poetry.scripts]
-audit = "cli:main"
+audit_service = "audit_service.cli:main"
+
+
+[tool.poetry]
+packages = [{include = "audit_service", from = "src"}]
+exclude = [
+    "data/models/**/*",
+    "**/*.onnx",
+]
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-# 配置国内镜像源加速下载
 [[tool.poetry.source]]
 name = "tsinghua"
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
